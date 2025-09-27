@@ -1,0 +1,395 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ CORE TABLES (9 total) ============
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  role         String   @default("FREE") // FREE, PREMIUM, ADMIN
+
+  // Profile data (merged from Profile table)
+  fullName    String?
+  avatarUrl   String?
+  bio         String?
+
+  // Settings as JSON (merged from UserSettings)
+  settings    Json     @default("{\"notifications\":{\"email\":true,\"push\":false},\"theme\":\"light\",\"timezone\":\"UTC\"}")
+
+  // Subscription data (merged from Subscription)
+  subscription Json    @default("{\"tier\":\"FREE\",\"stripeCustomerId\":null,\"expiresAt\":null}")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  actions     UserAction[]
+  events      Event[]
+  articles    Article[]
+  comments    Comment[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Forecaster {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+
+  // All profile data in JSON
+  profile     Json     @default("{\"bio\":null,\"avatar\":null,\"links\":{\"twitter\":null,\"website\":null},\"expertise\":[]}")
+
+  // Performance metrics in JSON
+  metrics     Json     @default("{\"accuracy\":0,\"totalPredictions\":0,\"correctPredictions\":0,\"brierScore\":null}")
+
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  predictions Prediction[]
+  content     Content[]
+  channels    ForecasterChannel[]
+
+  @@index([slug])
+}
+
+model Asset {
+  id         String   @id @default(cuid())
+  symbol     String
+  type       String   // CRYPTO, STOCK, ETF, COMMODITY, etc.
+
+  // All asset metadata in JSON
+  metadata   Json     @default("{\"name\":null,\"exchange\":null,\"sector\":null,\"marketCap\":null}")
+
+  // Latest price data (no separate cache tables)
+  priceData  Json     @default("{\"price\":null,\"change24h\":null,\"volume24h\":null,\"updatedAt\":null,\"source\":null}")
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  predictions Prediction[]
+  priceHistory PriceHistory[]
+
+  @@unique([symbol, type])
+  @@index([symbol])
+  @@index([type])
+}
+
+model Prediction {
+  id           String    @id @default(cuid())
+  forecasterId String
+  assetId      String?
+
+  // Core prediction data
+  prediction   String
+  confidence   Decimal?  @db.Decimal(5, 4)
+  targetDate   DateTime?
+  targetPrice  Decimal?  @db.Decimal(20, 8)
+  baselinePrice Decimal? @db.Decimal(20, 8) // Asset price at prediction creation time
+  direction    String?   @default("NEUTRAL") // BULLISH, BEARISH, NEUTRAL (mathematically determined)
+
+  // All metadata in JSON
+  metadata     Json      @default("{\"source\":{\"type\":null,\"url\":null},\"reasoning\":null,\"tags\":[],\"extraction\":{\"model\":null,\"confidence\":null}}")
+
+  // Validation
+  outcome      String    @default("PENDING") // CORRECT, INCORRECT, PARTIALLY_CORRECT, PENDING
+  validatedAt  DateTime?
+
+  createdAt    DateTime  @default(now()) // Also serves as extraction date
+
+  // Relations
+  forecaster   Forecaster @relation(fields: [forecasterId], references: [id], onDelete: Cascade)
+  asset        Asset?     @relation(fields: [assetId], references: [id])
+
+  @@index([forecasterId])
+  @@index([assetId])
+  @@index([outcome])
+  @@index([targetDate])
+}
+
+model Content {
+  id           String    @id @default(cuid())
+  forecasterId String?
+
+  sourceType   String    // YOUTUBE, TWITTER, ARTICLE
+  sourceId     String    // YouTube video ID, Tweet ID, etc.
+  sourceUrl    String?
+
+  // All content data in JSON
+  data         Json      @default("{\"title\":null,\"text\":null,\"transcript\":null,\"publishedAt\":null}")
+
+  // Processing status - More granular states for resumption
+  // COLLECTED: Initial state after content is fetched
+  // AUDIO_DOWNLOADING: MP3 download in progress
+  // AUDIO_DOWNLOADED: MP3 ready, awaiting transcription
+  // TRANSCRIBING: Transcription in progress
+  // TRANSCRIBED: Transcript ready, awaiting extraction
+  // EXTRACTING: Prediction extraction in progress
+  // PROCESSED: Successfully completed all steps
+  // FAILED: Processing failed (check processingMetadata for details)
+  status       String    @default("COLLECTED")
+
+  // Track processing progress and intermediate results
+  processingMetadata Json @default("{}")  // Stores: audioPath, lastStep, retryCount, error
+  processedAt  DateTime?
+
+  createdAt    DateTime  @default(now())
+
+  // Relations
+  forecaster   Forecaster? @relation(fields: [forecasterId], references: [id])
+
+  @@unique([sourceType, sourceId, forecasterId])
+  @@index([forecasterId])
+  @@index([status])
+}
+
+model PriceHistory {
+  id         String   @id @default(cuid())
+  assetId    String
+  price      Decimal  @db.Decimal(20, 8)
+  volume     Decimal? @db.Decimal(20, 2)
+  source     String
+  recordedAt DateTime @default(now())
+
+  // Relations
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, recordedAt(sort: Desc)])
+}
+
+model Event {
+  id         String   @id @default(cuid())
+  type       String   // USER_ACTION, EXTRACTION, VALIDATION, ERROR, etc.
+  entityType String?  // USER, PREDICTION, ASSET, etc.
+  entityId   String?
+
+  // All event data in JSON
+  data       Json     @default("{}")
+
+  userId     String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([type])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Job {
+  id           String    @id @default(cuid())
+  type         String    // COLLECT_CONTENT, EXTRACT_PREDICTIONS, VALIDATE, etc.
+  status       String    @default("PENDING")
+
+  // Job configuration and payload
+  payload      Json      @default("{}")
+
+  // Execution tracking
+  attempts     Int       @default(0)
+  scheduledFor DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+
+  createdAt    DateTime  @default(now())
+
+  @@index([status, scheduledFor])
+  @@index([type, status])
+}
+
+model UserAction {
+  id         String   @id @default(cuid())
+  userId     String
+  actionType String   // BOOKMARK, SUBSCRIBE, FOLLOW, etc.
+  targetType String   // PREDICTION, FORECASTER, etc.
+  targetId   String
+
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, actionType, targetType, targetId])
+  @@index([userId])
+  @@index([targetType, targetId])
+}
+
+model Article {
+  id            String    @id @default(cuid())
+  title         String
+  slug          String    @unique
+  content       String    @db.Text
+  excerpt       String?
+  featuredImage String?
+
+  status        String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  featured      Boolean   @default(false)
+  isPremium     Boolean   @default(false)
+  tags          String[]
+
+  authorId      String
+  categoryId    String?
+
+  publishDate   DateTime?
+  viewCount     Int       @default(0)
+  likeCount     Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  author        User      @relation(fields: [authorId], references: [id])
+  category      Category? @relation(fields: [categoryId], references: [id])
+  comments      Comment[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([authorId])
+  @@index([categoryId])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  color       String?
+  icon        String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  articles    Article[]
+
+  @@index([slug])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  authorId  String
+  articleId String
+
+  // Status for moderation
+  status    String   @default("PUBLISHED") // PUBLISHED, PENDING, HIDDEN
+  isEdited  Boolean  @default(false)
+
+  // Thread support
+  parentId  String?
+  replyCount Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+
+  @@index([articleId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([status])
+}
+
+// ============ CHANNEL COLLECTION SYSTEM ============
+
+model ForecasterChannel {
+  id            String   @id @default(cuid())
+  forecasterId  String
+  channelType   String   // YOUTUBE, TWITTER
+  channelId     String   // YouTube channel ID, X handle
+  channelName   String?
+  channelUrl    String
+
+  // Channel configuration
+  isPrimary     Boolean  @default(false) // Only one primary channel per type per forecaster
+  isActive      Boolean  @default(true)
+
+  // Collection settings in JSON
+  collectionSettings Json @default("{\"checkInterval\":3600,\"lastChecked\":null,\"enabled\":true}")
+
+  // Channel metadata in JSON
+  metadata      Json     @default("{\"subscribers\":null,\"verified\":null,\"description\":null}")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  forecaster    Forecaster @relation(fields: [forecasterId], references: [id], onDelete: Cascade)
+  keywords      ChannelKeyword[]
+  collectionJobs ChannelCollectionJob[]
+
+  @@unique([forecasterId, channelType, channelId])
+  @@index([forecasterId])
+  @@index([channelType])
+  @@index([isPrimary])
+  @@index([isActive])
+}
+
+model ChannelKeyword {
+  id          String   @id @default(cuid())
+  channelId   String
+  keyword     String
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false) // Default keywords like forecaster name
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  channel     ForecasterChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, keyword])
+  @@index([channelId])
+  @@index([keyword])
+  @@index([isDefault])
+}
+
+model ChannelCollectionJob {
+  id           String    @id @default(cuid())
+  channelId    String
+  jobType      String    // FULL_SCAN, KEYWORD_SCAN, INCREMENTAL
+  status       String    @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED
+
+  // Job configuration in JSON
+  config       Json      @default("{}")
+
+  // Execution tracking
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+
+  // Results tracking
+  videosFound  Int       @default(0)
+  videosProcessed Int    @default(0)
+  predictionsExtracted Int @default(0)
+
+  createdAt    DateTime  @default(now())
+
+  // Relations
+  channel      ForecasterChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId])
+  @@index([status])
+  @@index([jobType])
+  @@index([createdAt])
+}

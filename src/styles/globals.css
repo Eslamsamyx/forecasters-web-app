@@ -1,0 +1,264 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* CSS Variables for theming */
+:root {
+  --background: 210 50% 98%;
+  --foreground: 222.2 84% 4.9%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+
+  --primary: 200 85% 45%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --accent: 220 100% 60%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+
+  --radius: 0.5rem;
+
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-primary: 240 5.9% 10%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+
+  --card: 222.2 84% 6.9%;
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+
+  --primary: 200 85% 45%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+
+  --accent: 220 100% 50%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+
+  --sidebar-background: 240 5.9% 10%;
+  --sidebar-foreground: 240 4.8% 95.9%;
+  --sidebar-primary: 224.3 76.3% 48%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 3.7% 15.9%;
+  --sidebar-accent-foreground: 240 4.8% 95.9%;
+  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+}
+
+/* Base styles */
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Merriweather', serif;
+}
+
+code, pre {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+@layer components {
+  /* Design System Components */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500;
+  }
+
+  .blur-overlay {
+    @apply relative;
+  }
+
+  .blur-overlay::after {
+    @apply content-[''] absolute inset-0 backdrop-blur-md bg-white/70 flex items-center justify-center;
+  }
+
+  .premium-indicator::before {
+    @apply content-['Premium'] absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded z-10;
+  }
+
+  /* Line clamp utilities for text truncation */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .line-clamp-4 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+
+  /* Text overflow and wrapping utilities */
+  .break-words {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  .text-container {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .text-container-multiline {
+    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Finance Theme Colors */
+  .bg-finance-50 { @apply bg-blue-50; }
+  .bg-finance-100 { @apply bg-blue-100; }
+  .bg-finance-200 { @apply bg-blue-200; }
+  .bg-finance-300 { @apply bg-blue-300; }
+  .bg-finance-400 { @apply bg-blue-400; }
+  .bg-finance-500 { @apply bg-blue-500; }
+  .bg-finance-600 { @apply bg-blue-600; }
+  .bg-finance-700 { @apply bg-blue-700; }
+  .bg-finance-800 { @apply bg-blue-800; }
+  .bg-finance-900 { @apply bg-blue-900; }
+
+  .text-finance-50 { @apply text-blue-50; }
+  .text-finance-100 { @apply text-blue-100; }
+  .text-finance-200 { @apply text-blue-200; }
+  .text-finance-300 { @apply text-blue-300; }
+  .text-finance-400 { @apply text-blue-400; }
+  .text-finance-500 { @apply text-blue-500; }
+  .text-finance-600 { @apply text-blue-600; }
+  .text-finance-700 { @apply text-blue-700; }
+  .text-finance-800 { @apply text-blue-800; }
+  .text-finance-900 { @apply text-blue-900; }
+
+  .border-finance-50 { @apply border-blue-50; }
+  .border-finance-100 { @apply border-blue-100; }
+  .border-finance-200 { @apply border-blue-200; }
+  .border-finance-300 { @apply border-blue-300; }
+  .border-finance-400 { @apply border-blue-400; }
+  .border-finance-500 { @apply border-blue-500; }
+  .border-finance-600 { @apply border-blue-600; }
+  .border-finance-700 { @apply border-blue-700; }
+  .border-finance-800 { @apply border-blue-800; }
+  .border-finance-900 { @apply border-blue-900; }
+
+  /* Custom scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-gray-800;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 dark:bg-gray-600 rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500 dark:bg-gray-500;
+  }
+}
+
+@layer utilities {
+  /* Animations */
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes pulse-subtle {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Utility classes */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
