@@ -77,7 +77,7 @@ export function Layout({ children }: LayoutProps) {
                 href="/"
                 className="flex items-center px-2 py-2 text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
               >
-                🔮 Prism Analytics
+                🔮 Opinion Pointer
               </Link>
               <div className="hidden md:ml-8 md:flex md:space-x-6">
                 {navLinks.map((link) => {
