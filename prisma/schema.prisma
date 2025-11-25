@@ -393,3 +393,58 @@ model ChannelCollectionJob {
   @@index([jobType])
   @@index([createdAt])
 }
+
+// ============ SECURITY SYSTEM ============
+
+model SecurityEvent {
+  id            String   @id @default(cuid())
+
+  // Event classification
+  type          String   // AUTH_FAILURE, RATE_LIMIT_EXCEEDED, CSRF_VIOLATION, etc.
+  severity      String   // LOW, MEDIUM, HIGH, CRITICAL
+  category      String   // AUTH, RATE_LIMIT, CSRF, INPUT_VALIDATION, AI_SAFETY
+
+  // Who
+  userId        String?
+  ipAddress     String
+  userAgent     String?
+  sessionId     String?
+
+  // What
+  action        String   // login_attempt, api_call, mutation, etc.
+  resource      String   // endpoint or resource accessed
+  method        String   // GET, POST, etc.
+  statusCode    Int?
+
+  // When
+  timestamp     DateTime @default(now())
+  duration      Int?     // milliseconds
+
+  // Where
+  path          String
+  endpoint      String?
+
+  // Context
+  metadata      Json     @default("{}")
+  correlationId String?  // Links related events
+
+  // Result
+  success       Boolean  @default(true)
+  errorMessage  String?
+  stackTrace    String?  @db.Text
+
+  // Alert tracking
+  alertSent     Boolean  @default(false)
+  alertedAt     DateTime?
+
+  createdAt     DateTime @default(now())
+
+  @@index([type])
+  @@index([severity])
+  @@index([category])
+  @@index([userId])
+  @@index([ipAddress])
+  @@index([timestamp])
+  @@index([correlationId])
+  @@index([success])
+}

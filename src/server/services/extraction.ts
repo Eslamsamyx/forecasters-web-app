@@ -4,6 +4,8 @@ import { env } from "@/env.mjs";
 import { prisma } from "../db";
 import crypto from 'crypto';
 import { MarketDataService } from './marketData';
+import { getAiSanitizer, securityLogger, securityConfig } from '../security';
+import { TRPCError } from '@trpc/server';
 
 interface DirectionCorrection {
   originalAiDirection: string;
@@ -109,6 +111,62 @@ export class UnifiedExtractionService {
   async extractFromVideo(context: UnifiedVideoContext): Promise<UnifiedExtractionResult> {
     const startTime = Date.now();
     console.log(`🚀 [Unified] Starting extraction for: ${context.title}`);
+
+    // Step 0: AI Sanitization (Phase 5 Security)
+    if (securityConfig.aiSanitization.enabled) {
+      const sanitizer = getAiSanitizer(securityConfig.aiSanitization);
+      const sanitizationResult = await sanitizer.analyze({
+        transcript: context.transcript,
+        title: context.title,
+        description: context.description,
+        videoId: context.videoId,
+        channelName: context.channelName,
+      });
+
+      // Handle BLOCK action
+      if (sanitizationResult.action === 'BLOCK') {
+        await securityLogger.logAiInjectionAttempt(
+          context.transcript.substring(0, 200), // First 200 chars for logging
+          sanitizationResult.score,
+          'unknown', // IP address not available here
+          undefined // User ID not available here
+        );
+
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Content contains suspicious patterns and cannot be processed for security reasons.',
+        });
+      }
+
+      // Handle SANITIZE action
+      if (sanitizationResult.action === 'SANITIZE' && sanitizationResult.sanitizedContent) {
+        await securityLogger.logAiInjectionAttempt(
+          context.transcript.substring(0, 200),
+          sanitizationResult.score,
+          'unknown',
+          undefined
+        );
+
+        console.log(`🛡️ [Security] Content sanitized (score: ${sanitizationResult.score}, threats: ${sanitizationResult.threats.length})`);
+
+        // Use sanitized content for extraction
+        context.transcript = sanitizationResult.sanitizedContent;
+      }
+
+      // Log if score is >= WARN threshold (even if allowed)
+      if (
+        sanitizationResult.action === 'ALLOW' &&
+        sanitizationResult.score >= securityConfig.aiSanitization.warnThreshold &&
+        securityConfig.aiSanitization.logAllAttempts
+      ) {
+        await securityLogger.logAiInjectionAttempt(
+          context.transcript.substring(0, 200),
+          sanitizationResult.score,
+          'unknown',
+          undefined
+        );
+      }
+    }
 
     // Step 1: Estimate processing requirements
     const estimatedTokens = this.estimateTokens(context);

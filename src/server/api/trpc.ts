@@ -8,12 +8,16 @@ import { prisma } from "../db";
 
 interface CreateContextOptions {
   session: any | null;
+  req?: any;
+  res?: any;
 }
 
 export const createInnerTRPCContext = (opts: CreateContextOptions) => {
   return {
     session: opts.session,
     prisma,
+    req: opts.req,
+    res: opts.res,
   };
 };
 
@@ -23,6 +27,8 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
 
   return createInnerTRPCContext({
     session,
+    req,
+    res,
   });
 };
 

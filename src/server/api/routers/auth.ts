@@ -6,32 +6,81 @@ import {
   protectedProcedure,
 } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import {
+  passwordSchema,
+  validatePassword,
+  securityLogger,
+} from "../../security";
 
 export const authRouter = createTRPCRouter({
   register: publicProcedure
     .input(
       z.object({
         email: z.string().email(),
-        password: z.string().min(8),
+        password: passwordSchema,
         fullName: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const { email, password, fullName } = input;
+      const ipAddress = ctx.req?.headers['x-forwarded-for'] as string ||
+                       ctx.req?.headers['x-real-ip'] as string ||
+                       ctx.req?.socket?.remoteAddress ||
+                       'unknown';
+      const userAgent = ctx.req?.headers['user-agent'];
 
+      // Check if user exists
       const exists = await ctx.prisma.user.findUnique({
         where: { email },
       });
 
       if (exists) {
+        // Log failed registration attempt
+        await securityLogger.logAuthFailure(
+          email,
+          ipAddress,
+          'User already exists',
+          userAgent
+        );
+
         throw new TRPCError({
           code: "CONFLICT",
           message: "User already exists",
         });
       }
 
+      // Additional password validation with detailed feedback
+      const validationResult = await validatePassword(password);
+      if (!validationResult.valid) {
+        // Log failed registration due to weak password
+        await securityLogger.log({
+          type: 'AUTH_FAILURE',
+          severity: 'LOW',
+          category: 'AUTH',
+          ipAddress,
+          userAgent,
+          action: 'register',
+          resource: 'user',
+          method: 'POST',
+          path: '/api/trpc/auth.register',
+          success: false,
+          metadata: {
+            email,
+            reason: 'Weak or breached password',
+            errors: validationResult.errors,
+          },
+        });
+
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: validationResult.errors[0] || "Password does not meet security requirements",
+        });
+      }
+
+      // Hash password
       const passwordHash = await bcrypt.hash(password, 10);
 
+      // Create user
       const user = await ctx.prisma.user.create({
         data: {
           email,
@@ -57,6 +106,9 @@ export const authRouter = createTRPCRouter({
           createdAt: true,
         },
       });
+
+      // Log successful registration
+      await securityLogger.logAuthSuccess(user.id, ipAddress, userAgent);
 
       return {
         success: true,
@@ -286,11 +338,16 @@ export const authRouter = createTRPCRouter({
     .input(
       z.object({
         token: z.string(),
-        newPassword: z.string().min(8),
+        newPassword: passwordSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
       const { token, newPassword } = input;
+      const ipAddress = ctx.req?.headers['x-forwarded-for'] as string ||
+                       ctx.req?.headers['x-real-ip'] as string ||
+                       ctx.req?.socket?.remoteAddress ||
+                       'unknown';
+      const userAgent = ctx.req?.headers['user-agent'];
 
       // Find user with matching reset token
       const users = await ctx.prisma.user.findMany({
@@ -327,6 +384,34 @@ export const authRouter = createTRPCRouter({
         });
       }
 
+      // Validate new password
+      const validationResult = await validatePassword(newPassword);
+      if (!validationResult.valid) {
+        // Log failed password reset attempt
+        await securityLogger.log({
+          type: 'AUTH_FAILURE',
+          severity: 'MEDIUM',
+          category: 'AUTH',
+          userId: user.id,
+          ipAddress,
+          userAgent,
+          action: 'password_reset',
+          resource: 'user',
+          method: 'POST',
+          path: '/api/trpc/auth.resetPassword',
+          success: false,
+          metadata: {
+            reason: 'Weak or breached password',
+            errors: validationResult.errors,
+          },
+        });
+
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: validationResult.errors[0] || "Password does not meet security requirements",
+        });
+      }
+
       // Hash new password
       const passwordHash = await bcrypt.hash(newPassword, 10);
 
@@ -338,6 +423,24 @@ export const authRouter = createTRPCRouter({
         data: {
           passwordHash,
           settings: cleanSettings,
+        },
+      });
+
+      // Log successful password reset
+      await securityLogger.log({
+        type: 'PASSWORD_CHANGE',
+        severity: 'MEDIUM',
+        category: 'AUTH',
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        action: 'password_reset',
+        resource: 'user',
+        method: 'POST',
+        path: '/api/trpc/auth.resetPassword',
+        success: true,
+        metadata: {
+          resetMethod: 'email_token',
         },
       });
 
@@ -363,11 +466,16 @@ export const authRouter = createTRPCRouter({
     .input(
       z.object({
         currentPassword: z.string(),
-        newPassword: z.string().min(8),
+        newPassword: passwordSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
       const { currentPassword, newPassword } = input;
+      const ipAddress = ctx.req?.headers['x-forwarded-for'] as string ||
+                       ctx.req?.headers['x-real-ip'] as string ||
+                       ctx.req?.socket?.remoteAddress ||
+                       'unknown';
+      const userAgent = ctx.req?.headers['user-agent'];
 
       const user = await ctx.prisma.user.findUnique({
         where: { id: ctx.session.user.id },
@@ -380,20 +488,103 @@ export const authRouter = createTRPCRouter({
         });
       }
 
+      // Verify current password
       const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
 
       if (!isValid) {
+        // Log failed password change attempt
+        await securityLogger.logAuthFailure(
+          user.email,
+          ipAddress,
+          'Incorrect current password',
+          userAgent
+        );
+
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Current password is incorrect",
         });
       }
 
+      // Validate new password
+      const validationResult = await validatePassword(newPassword);
+      if (!validationResult.valid) {
+        // Log failed password change due to weak password
+        await securityLogger.log({
+          type: 'AUTH_FAILURE',
+          severity: 'LOW',
+          category: 'AUTH',
+          userId: user.id,
+          ipAddress,
+          userAgent,
+          action: 'password_change',
+          resource: 'user',
+          method: 'POST',
+          path: '/api/trpc/auth.changePassword',
+          success: false,
+          metadata: {
+            reason: 'Weak or breached password',
+            errors: validationResult.errors,
+          },
+        });
+
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: validationResult.errors[0] || "Password does not meet security requirements",
+        });
+      }
+
+      // Check if new password is same as old password
+      const isSameAsOld = await bcrypt.compare(newPassword, user.passwordHash);
+      if (isSameAsOld) {
+        await securityLogger.log({
+          type: 'AUTH_FAILURE',
+          severity: 'LOW',
+          category: 'AUTH',
+          userId: user.id,
+          ipAddress,
+          userAgent,
+          action: 'password_change',
+          resource: 'user',
+          method: 'POST',
+          path: '/api/trpc/auth.changePassword',
+          success: false,
+          metadata: {
+            reason: 'New password same as current password',
+          },
+        });
+
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "New password must be different from current password",
+        });
+      }
+
+      // Hash new password
       const passwordHash = await bcrypt.hash(newPassword, 10);
 
+      // Update password
       await ctx.prisma.user.update({
         where: { id: user.id },
         data: { passwordHash },
+      });
+
+      // Log successful password change
+      await securityLogger.log({
+        type: 'PASSWORD_CHANGE',
+        severity: 'MEDIUM',
+        category: 'AUTH',
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        action: 'password_change',
+        resource: 'user',
+        method: 'POST',
+        path: '/api/trpc/auth.changePassword',
+        success: true,
+        metadata: {
+          changeMethod: 'user_initiated',
+        },
       });
 
       // Log the event
