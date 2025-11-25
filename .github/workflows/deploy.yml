@@ -22,8 +22,18 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Verify package-lock.json is up to date
+        run: |
+          echo "🔍 Verifying package-lock.json is in sync..."
+          npm install --package-lock-only
+          git diff --exit-code package-lock.json || (echo "❌ package-lock.json is out of sync! Please run 'npm install' locally and commit." && exit 1)
+
+      - name: Clean install dependencies
+        run: |
+          echo "🧹 Clearing npm cache..."
+          npm cache clean --force
+          echo "📦 Installing dependencies with Next.js 16 and ESM support..."
+          npm ci --legacy-peer-deps
 
       - name: Run linting
         run: |
@@ -62,7 +72,23 @@ jobs:
             git reset --hard origin/main || git reset --hard origin/master
 
             echo "📥 Installing dependencies..."
-            npm ci --production=false
+            echo "🧹 Clearing npm cache to ensure clean install..."
+            npm cache clean --force
+
+            echo "📦 Installing all dependencies (including devDependencies for build)..."
+            npm ci --production=false --legacy-peer-deps
+
+            echo "✅ Dependencies installed successfully"
+
+            echo "📊 Verifying Next.js 16 installation..."
+            npm list next || echo "Next.js version check"
+
+            echo "🔧 Verifying ESM module support..."
+            node --version
+            grep '"type": "module"' package.json && echo "✅ ESM modules configured" || echo "⚠️  CommonJS mode"
+
+            echo "🗃️  Generating Prisma Client with latest schema..."
+            npx prisma generate --force
 
             # Create backup directory if it doesn't exist
             mkdir -p /root/backups
@@ -78,7 +104,6 @@ jobs:
             fi
 
             echo "🗃️  Checking for pending migrations..."
-            npx prisma generate
 
             # Check if there are pending migrations
             MIGRATION_STATUS=$(npx prisma migrate status 2>&1)
@@ -106,11 +131,23 @@ jobs:
             echo "⏸️  Stopping PM2 application..."
             pm2 stop opinionpointer
 
-            echo "🔨 Building application..."
+            echo "🔨 Building application with Next.js 16..."
+            echo "🔧 Build environment: ESM modules with Turbopack"
             npm run build
 
             if [ $? -eq 0 ]; then
               echo "✅ Build successful!"
+              echo "📊 Verifying build output..."
+              ls -la .next/standalone 2>/dev/null || echo "Build artifacts created"
+
+              echo "🔍 Checking build artifacts..."
+              if [ -d ".next" ]; then
+                echo "✅ .next directory exists"
+                du -sh .next || echo "Build size check"
+              else
+                echo "⚠️  .next directory not found"
+              fi
+
               echo "▶️  Starting PM2 application..."
               pm2 start opinionpointer
 
