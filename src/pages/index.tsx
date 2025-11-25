@@ -225,13 +225,13 @@ const Home: NextPage = () => {
                     transition={{ duration: 0.8, delay: 0.2 }}
                   >
                     Find the
-                    <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent block">
+                    <span className="bg-gradient-to-r from-white via-blue-100 to-cyan-200 bg-clip-text text-transparent block">
                       Best Forecasters
                     </span>
                   </motion.h1>
 
                   <motion.p
-                    className="text-lg sm:text-xl lg:text-2xl text-slate-300 max-w-lg mx-auto lg:mx-0 leading-relaxed"
+                    className="text-lg sm:text-xl lg:text-2xl text-slate-100 max-w-lg mx-auto lg:mx-0 leading-relaxed"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.4 }}
@@ -294,15 +294,15 @@ const Home: NextPage = () => {
                           animate={{ scale: [1, 1.02, 1] }}
                           transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
                         >
-                          <div className="text-blue-300 group-hover:text-blue-200 transition-colors">
+                          <div className="text-cyan-100 group-hover:text-cyan-50 transition-colors">
                             {stat.icon}
                           </div>
                           <div className="text-xl sm:text-2xl font-bold text-white">
                             {stat.value}
-                            <span className="text-blue-300">{stat.suffix}</span>
+                            <span className="text-cyan-100">{stat.suffix}</span>
                           </div>
                         </motion.div>
-                        <div className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                        <div className="text-sm text-slate-200 group-hover:text-slate-100 transition-colors">
                           {stat.label}
                         </div>
                       </motion.div>
@@ -311,7 +311,7 @@ const Home: NextPage = () => {
 
                   {/* Social Proof Banner */}
                   <motion.div
-                    className="mt-6 lg:mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 text-sm text-slate-300"
+                    className="mt-6 lg:mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 text-sm text-slate-100"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 1.2 }}
@@ -375,7 +375,7 @@ const Home: NextPage = () => {
                             </div>
                             <div>
                               <div className="text-white text-sm font-medium">{forecaster.name}</div>
-                              <div className="text-slate-300 text-xs">{forecaster.accuracy}% accuracy</div>
+                              <div className="text-slate-200 text-xs">{forecaster.accuracy}% accuracy</div>
                             </div>
                           </div>
                           <div className="text-right">
