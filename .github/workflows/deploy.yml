@@ -64,9 +64,44 @@ jobs:
             echo "📥 Installing dependencies..."
             npm ci --production=false
 
-            echo "🗃️  Running database migrations..."
+            # Create backup directory if it doesn't exist
+            mkdir -p /root/backups
+
+            echo "💾 Creating database backup before deployment..."
+            BACKUP_FILE="/root/backups/db_backup_$(date +%Y%m%d_%H%M%S).sql"
+            sudo -u postgres pg_dump opinionpointer > $BACKUP_FILE
+
+            if [ $? -eq 0 ]; then
+              echo "✅ Database backup created: $BACKUP_FILE"
+            else
+              echo "⚠️  Database backup failed, but continuing..."
+            fi
+
+            echo "🗃️  Checking for pending migrations..."
             npx prisma generate
-            npx prisma migrate deploy || echo "No migrations to run"
+
+            # Check if there are pending migrations
+            MIGRATION_STATUS=$(npx prisma migrate status 2>&1)
+            echo "$MIGRATION_STATUS"
+
+            if echo "$MIGRATION_STATUS" | grep -q "Database schema is up to date"; then
+              echo "✅ No migrations needed"
+              MIGRATIONS_APPLIED=false
+            else
+              echo "🔄 Applying database migrations..."
+              npx prisma migrate deploy
+
+              if [ $? -eq 0 ]; then
+                echo "✅ Migrations applied successfully"
+                MIGRATIONS_APPLIED=true
+              else
+                echo "❌ Migration failed! Restoring database..."
+                sudo -u postgres psql opinionpointer < $BACKUP_FILE
+                echo "🔄 Database restored from backup"
+                pm2 status opinionpointer
+                exit 1
+              fi
+            fi
 
             echo "⏸️  Stopping PM2 application..."
             pm2 stop opinionpointer
@@ -85,9 +120,21 @@ jobs:
               # Verify application is running
               pm2 status opinionpointer
 
+              # Keep last 10 backups only
+              echo "🧹 Cleaning old backups..."
+              ls -t /root/backups/db_backup_*.sql | tail -n +11 | xargs -r rm
+
               echo "✅ Deployment completed successfully!"
             else
               echo "❌ Build failed! Rolling back..."
+
+              # If migrations were applied, restore database
+              if [ "$MIGRATIONS_APPLIED" = true ]; then
+                echo "🔄 Restoring database from backup..."
+                sudo -u postgres psql opinionpointer < $BACKUP_FILE
+                echo "✅ Database restored"
+              fi
+
               pm2 start opinionpointer
               echo "🔄 Application restarted with previous version"
               exit 1
