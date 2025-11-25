@@ -119,39 +119,140 @@ jobs:
 
             echo "💾 Creating database backup before deployment..."
             BACKUP_FILE="/root/backups/db_backup_$(date +%Y%m%d_%H%M%S).sql"
-            sudo -u postgres pg_dump opinionpointer > $BACKUP_FILE
 
-            if [ $? -eq 0 ]; then
-              echo "✅ Database backup created: $BACKUP_FILE"
-            else
-              echo "⚠️  Database backup failed, but continuing..."
+            # Create backup with error handling
+            if ! sudo -u postgres pg_dump opinionpointer > "$BACKUP_FILE" 2>/dev/null; then
+              echo "❌ Database backup failed!"
+              pm2 status opinionpointer
+              exit 1
             fi
+
+            # Validate backup file exists and is not empty
+            if [ ! -s "$BACKUP_FILE" ]; then
+              echo "❌ Backup file is empty or not created!"
+              rm -f "$BACKUP_FILE"
+              pm2 status opinionpointer
+              exit 1
+            fi
+
+            BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+            echo "✅ Database backup created: $BACKUP_FILE (Size: $BACKUP_SIZE)"
+
+            # Function to restore database safely
+            restore_database() {
+              echo "🔄 Restoring database from backup..."
+
+              # Create a temporary restore database to validate backup first
+              TEMP_DB="opinionpointer_restore_test_$$"
+
+              # Restore to temp DB first to validate
+              if sudo -u postgres createdb "$TEMP_DB" 2>/dev/null; then
+                if sudo -u postgres psql "$TEMP_DB" < "$BACKUP_FILE" > /dev/null 2>&1; then
+                  echo "✅ Backup validation successful"
+                  sudo -u postgres dropdb "$TEMP_DB" 2>/dev/null
+
+                  # Now do the actual restore
+                  sudo -u postgres psql opinionpointer -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'opinionpointer' AND pid <> pg_backend_pid();" > /dev/null 2>&1
+
+                  # Use pg_restore-compatible approach - recreate from backup
+                  sudo -u postgres dropdb opinionpointer 2>/dev/null
+                  sudo -u postgres createdb -O opinionpointer opinionpointer
+                  sudo -u postgres psql opinionpointer < "$BACKUP_FILE" > /dev/null 2>&1
+
+                  if [ $? -eq 0 ]; then
+                    echo "✅ Database restored successfully"
+                    return 0
+                  fi
+                fi
+                sudo -u postgres dropdb "$TEMP_DB" 2>/dev/null
+              fi
+
+              echo "❌ Database restore failed! Manual intervention required."
+              echo "Backup file: $BACKUP_FILE"
+              return 1
+            }
 
             echo "🗃️  Checking for pending database migrations..."
 
-            # Check migration status
+            # Check for stuck migration locks
+            LOCK_STATUS=$(sudo -u postgres psql opinionpointer -t -c "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NULL AND started_at < NOW() - INTERVAL '30 minutes';" 2>/dev/null | tr -d ' ')
+            if [ "$LOCK_STATUS" != "0" ] && [ -n "$LOCK_STATUS" ]; then
+              echo "⚠️  Found stuck migrations, cleaning up..."
+              sudo -u postgres psql opinionpointer -c "DELETE FROM _prisma_migrations WHERE finished_at IS NULL AND started_at < NOW() - INTERVAL '30 minutes';" > /dev/null 2>&1
+            fi
+
+            # Check migration status with comprehensive error handling
             MIGRATION_STATUS=$(npx prisma migrate status 2>&1)
+            MIGRATION_EXIT_CODE=$?
             echo "$MIGRATION_STATUS"
+
+            # Handle various migration status scenarios
+            if [ $MIGRATION_EXIT_CODE -ne 0 ]; then
+              echo "❌ Failed to check migration status!"
+
+              # Check if it's a connection issue
+              if echo "$MIGRATION_STATUS" | grep -qi "connection\|connect\|ECONNREFUSED"; then
+                echo "❌ Database connection failed!"
+                exit 1
+              fi
+
+              # Check if migrations table doesn't exist (fresh db)
+              if echo "$MIGRATION_STATUS" | grep -qi "does not exist\|relation.*_prisma_migrations"; then
+                echo "📋 Migrations table doesn't exist - will be created on first migration"
+              else
+                echo "❌ Unknown migration status error"
+                exit 1
+              fi
+            fi
 
             if echo "$MIGRATION_STATUS" | grep -q "Database schema is up to date"; then
               echo "✅ No migrations needed"
               MIGRATIONS_APPLIED=false
+            elif echo "$MIGRATION_STATUS" | grep -qi "drift\|schema drift"; then
+              echo "⚠️  Schema drift detected!"
+              echo "🔍 Checking drift details..."
+              npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code || true
+              echo "🔄 Attempting to resolve drift by applying migrations..."
+              MIGRATIONS_APPLIED=true
+            elif echo "$MIGRATION_STATUS" | grep -qi "failed\|rolled back"; then
+              echo "⚠️  Found failed migration records, attempting to resolve..."
+              # Mark failed migrations for retry
+              sudo -u postgres psql opinionpointer -c "DELETE FROM _prisma_migrations WHERE rolled_back_at IS NOT NULL OR (finished_at IS NULL AND applied_steps_count = 0);" > /dev/null 2>&1
+              MIGRATIONS_APPLIED=true
             else
-              echo "🔄 Applying database migrations..."
-              npx prisma migrate deploy
+              MIGRATIONS_APPLIED=true
+            fi
 
-              if [ $? -eq 0 ]; then
-                echo "✅ Migrations applied successfully"
-                MIGRATIONS_APPLIED=true
-              else
-                echo "❌ Migration failed! Restoring database..."
-                sudo -u postgres dropdb opinionpointer
-                sudo -u postgres createdb -O opinionpointer opinionpointer
-                sudo -u postgres psql opinionpointer < $BACKUP_FILE
-                echo "🔄 Database restored from backup"
-                pm2 status opinionpointer
+            if [ "$MIGRATIONS_APPLIED" = true ]; then
+              echo "🔄 Applying database migrations..."
+
+              # Run migrations with timeout to prevent hanging
+              timeout 300 npx prisma migrate deploy 2>&1
+              MIGRATE_EXIT_CODE=$?
+
+              if [ $MIGRATE_EXIT_CODE -eq 124 ]; then
+                echo "❌ Migration timed out after 5 minutes!"
+                restore_database
+                pm2 start opinionpointer
+                exit 1
+              elif [ $MIGRATE_EXIT_CODE -ne 0 ]; then
+                echo "❌ Migration failed! (Exit code: $MIGRATE_EXIT_CODE)"
+                restore_database
+                pm2 start opinionpointer
                 exit 1
               fi
+
+              echo "✅ Migrations applied successfully"
+
+              # Verify database is accessible after migrations
+              echo "🔍 Verifying database connectivity after migrations..."
+              if ! npx prisma db execute --stdin <<< "SELECT 1;" > /dev/null 2>&1; then
+                echo "❌ Database connectivity check failed after migrations!"
+                restore_database
+                pm2 start opinionpointer
+                exit 1
+              fi
+              echo "✅ Database connectivity verified"
             fi
 
             echo "⏸️  Stopping PM2 application..."
@@ -193,11 +294,7 @@ jobs:
 
               # If migrations were applied, restore database
               if [ "$MIGRATIONS_APPLIED" = true ]; then
-                echo "🔄 Restoring database from backup..."
-                sudo -u postgres dropdb opinionpointer
-                sudo -u postgres createdb -O opinionpointer opinionpointer
-                sudo -u postgres psql opinionpointer < $BACKUP_FILE
-                echo "✅ Database restored"
+                restore_database
               fi
 
               pm2 start opinionpointer
