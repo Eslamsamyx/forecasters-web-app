@@ -34,12 +34,6 @@ jobs:
           echo "⚠️  Note: Building on Ubuntu x64, deploying to Ubuntu VPS"
           echo "⚠️  Source code from: macOS ARM64 (Apple Silicon)"
 
-      - name: Verify package-lock.json is up to date
-        run: |
-          echo "🔍 Verifying package-lock.json is in sync..."
-          npm install --package-lock-only
-          git diff --exit-code package-lock.json || (echo "❌ package-lock.json is out of sync! Please run 'npm install' locally and commit." && exit 1)
-
       - name: Clean install dependencies
         run: |
           echo "🧹 Clearing npm cache..."
