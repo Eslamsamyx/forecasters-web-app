@@ -1,7 +1,6 @@
 import { type ReactNode, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/router";
 import {
   Menu,
   X,
@@ -25,14 +24,31 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { data: session } = useSession();
-  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState('/');
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Update current path from window.location (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentPath(window.location.pathname);
+
+      // Listen for route changes
+      const handleRouteChange = () => {
+        setCurrentPath(window.location.pathname);
+      };
+
+      window.addEventListener('popstate', handleRouteChange);
+      return () => window.removeEventListener('popstate', handleRouteChange);
+    }
+  }, []);
 
   const handleSignOut = async () => {
     await signOut({ redirect: false });
-    router.push("/");
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   // Get user initials for avatar
@@ -81,7 +97,7 @@ export function Layout({ children }: LayoutProps) {
               </Link>
               <div className="hidden md:ml-8 md:flex md:space-x-6">
                 {navLinks.map((link) => {
-                  const isActive = router.pathname === link.href;
+                  const isActive = currentPath === link.href;
                   return (
                     <Link
                       key={link.href}
@@ -244,7 +260,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="md:hidden border-t border-gray-200">
             <div className="pt-2 pb-3 space-y-1">
               {navLinks.map((link) => {
-                const isActive = router.pathname === link.href;
+                const isActive = currentPath === link.href;
                 return (
                   <Link
                     key={link.href}

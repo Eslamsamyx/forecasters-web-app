@@ -469,3 +469,8 @@ const ChannelKeywords: NextPage = () => {
 };
 
 export default ChannelKeywords;
+
+// Force server-side rendering to avoid SSG issues with useRouter in Next.js 16
+export async function getServerSideProps() {
+  return { props: {} };
+}
