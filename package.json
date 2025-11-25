@@ -30,6 +30,14 @@
   "author": "",
   "license": "ISC",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
     "@google/generative-ai": "^0.24.1",

@@ -22,6 +22,18 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Verify build environment
+        run: |
+          echo "🔍 GitHub Actions Runner Environment:"
+          echo "OS: ${{ runner.os }}"
+          echo "Architecture: ${{ runner.arch }}"
+          echo "Platform: $(uname -s) $(uname -m)"
+          echo "Node.js: $(node --version)"
+          echo "NPM: $(npm --version)"
+          echo "---"
+          echo "⚠️  Note: Building on Ubuntu x64, deploying to Ubuntu VPS"
+          echo "⚠️  Source code from: macOS ARM64 (Apple Silicon)"
+
       - name: Verify package-lock.json is up to date
         run: |
           echo "🔍 Verifying package-lock.json is in sync..."
@@ -75,20 +87,38 @@ jobs:
             echo "🧹 Clearing npm cache to ensure clean install..."
             npm cache clean --force
 
+            echo "🔧 Setting up Ubuntu/Linux environment..."
+            export NODE_ENV=production
+
             echo "📦 Installing all dependencies (including devDependencies for build)..."
+            echo "⚙️  Platform: Linux x64 (rebuilding native binaries from macOS ARM64 source)"
             npm ci --production=false --legacy-peer-deps
+
+            echo "🔨 Rebuilding native binaries for Ubuntu..."
+            npm rebuild || echo "⚠️  Some binaries failed to rebuild but continuing..."
 
             echo "✅ Dependencies installed successfully"
 
             echo "📊 Verifying Next.js 16 installation..."
             npm list next || echo "Next.js version check"
 
-            echo "🔧 Verifying ESM module support..."
-            node --version
+            echo "🔧 Verifying platform and environment..."
+            echo "Platform: $(uname -s) $(uname -m)"
+            echo "Node.js: $(node --version)"
+            echo "NPM: $(npm --version)"
+
+            echo "📋 Checking ESM module support..."
             grep '"type": "module"' package.json && echo "✅ ESM modules configured" || echo "⚠️  CommonJS mode"
 
-            echo "🗃️  Generating Prisma Client with latest schema..."
+            echo "🗃️  Generating Prisma Client for Ubuntu/Linux..."
             npx prisma generate --force
+
+            echo "🔍 Verifying Prisma Client generation..."
+            if [ -d "node_modules/.prisma/client" ]; then
+              echo "✅ Prisma Client generated successfully"
+            else
+              echo "⚠️  Prisma Client directory not found"
+            fi
 
             # Create backup directory if it doesn't exist
             mkdir -p /root/backups
