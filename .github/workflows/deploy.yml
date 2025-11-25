@@ -127,27 +127,31 @@ jobs:
               echo "⚠️  Database backup failed, but continuing..."
             fi
 
-            echo "🗃️  Syncing database schema..."
+            echo "🗃️  Checking for pending database migrations..."
 
-            # Sync database to match prisma schema
-            npx prisma db push --skip-generate --accept-data-loss 2>&1 | tee /tmp/prisma_push.log
+            # Check migration status
+            MIGRATION_STATUS=$(npx prisma migrate status 2>&1)
+            echo "$MIGRATION_STATUS"
 
-            if [ ${PIPESTATUS[0]} -eq 0 ]; then
-              if grep -q "already in sync" /tmp/prisma_push.log; then
-                echo "✅ Database schema already in sync"
-                SCHEMA_CHANGED=false
-              else
-                echo "✅ Database schema updated successfully"
-                SCHEMA_CHANGED=true
-              fi
+            if echo "$MIGRATION_STATUS" | grep -q "Database schema is up to date"; then
+              echo "✅ No migrations needed"
+              MIGRATIONS_APPLIED=false
             else
-              echo "❌ Schema sync failed! Restoring database..."
-              sudo -u postgres dropdb opinionpointer
-              sudo -u postgres createdb -O opinionpointer opinionpointer
-              sudo -u postgres psql opinionpointer < $BACKUP_FILE
-              echo "🔄 Database restored from backup"
-              pm2 status opinionpointer
-              exit 1
+              echo "🔄 Applying database migrations..."
+              npx prisma migrate deploy
+
+              if [ $? -eq 0 ]; then
+                echo "✅ Migrations applied successfully"
+                MIGRATIONS_APPLIED=true
+              else
+                echo "❌ Migration failed! Restoring database..."
+                sudo -u postgres dropdb opinionpointer
+                sudo -u postgres createdb -O opinionpointer opinionpointer
+                sudo -u postgres psql opinionpointer < $BACKUP_FILE
+                echo "🔄 Database restored from backup"
+                pm2 status opinionpointer
+                exit 1
+              fi
             fi
 
             echo "⏸️  Stopping PM2 application..."
@@ -187,8 +191,8 @@ jobs:
             else
               echo "❌ Build failed! Rolling back..."
 
-              # If schema was changed, restore database
-              if [ "$SCHEMA_CHANGED" = true ]; then
+              # If migrations were applied, restore database
+              if [ "$MIGRATIONS_APPLIED" = true ]; then
                 echo "🔄 Restoring database from backup..."
                 sudo -u postgres dropdb opinionpointer
                 sudo -u postgres createdb -O opinionpointer opinionpointer
