@@ -106,22 +106,23 @@ const MethodologyPage: NextPage = () => {
             {/* Header */}
             <motion.div className="mb-12" variants={itemVariants}>
               <Card className="shadow-xl bg-white/90 backdrop-blur-xl border-white/20">
-                <CardContent className="p-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
+                <CardContent className="p-4 sm:p-6 lg:p-8">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
+                    <div className="flex-1">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2 sm:mb-3">
                         Accuracy Methodology
                       </h1>
-                      <p className="text-lg text-gray-600">
+                      <p className="text-sm sm:text-base lg:text-lg text-gray-600">
                         Advanced statistical framework for cryptocurrency prediction validation
                       </p>
                     </div>
-                    <div className="text-right">
-                      <div className="space-y-3">
-                        <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 text-indigo-700 border-indigo-200">
+                    <div className="flex items-center justify-between lg:justify-end gap-3 lg:text-right">
+                      <div className="space-y-2 sm:space-y-3 flex-shrink-0">
+                        <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 text-indigo-700 border-indigo-200 text-xs sm:text-sm">
                           v{metrics.methodologyVersion}
                         </Badge>
-                        <div className="relative group">
+                      </div>
+                        <div className="relative group flex-shrink-0">
                           {/* Gradient glow effect */}
                           <div className={`absolute -inset-0.5 bg-gradient-to-r ${
                             showSuccess
@@ -132,27 +133,27 @@ const MethodologyPage: NextPage = () => {
                           <Button
                             onClick={handleRefresh}
                             disabled={isRefreshing}
-                            className={`relative px-6 py-3 bg-gradient-to-r ${
+                            className={`relative px-3 py-2 sm:px-4 sm:py-2.5 lg:px-6 lg:py-3 bg-gradient-to-r ${
                               showSuccess
                                 ? 'from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
                                 : 'from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'
                             } text-white font-semibold rounded-lg transform transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed`}
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3">
                               {showSuccess ? (
                                 <>
-                                  <Sparkles className="w-5 h-5 animate-pulse" />
-                                  <CheckCircle2 className="w-5 h-5" />
+                                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+                                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </>
                               ) : (
-                                <RefreshCw className={`w-5 h-5 ${
+                                <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${
                                   isRefreshing
                                     ? 'animate-spin'
                                     : 'group-hover:rotate-180 transition-transform duration-500'
                                 }`} />
                               )}
                               <div className="flex flex-col items-start">
-                                <span className="text-sm font-bold flex items-center gap-1">
+                                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
                                   {showSuccess
                                     ? 'Updated!'
                                     : isRefreshing
@@ -160,7 +161,7 @@ const MethodologyPage: NextPage = () => {
                                       : 'Refresh Data'
                                   }
                                 </span>
-                                <span className="text-xs opacity-90">
+                                <span className="text-[10px] sm:text-xs opacity-90">
                                   {getTimeSinceRefresh()}
                                 </span>
                               </div>
@@ -177,14 +178,13 @@ const MethodologyPage: NextPage = () => {
                             {/* Success sparkle effect */}
                             {showSuccess && (
                               <>
-                                <Sparkles className="absolute -top-2 -left-2 w-4 h-4 text-yellow-300 animate-pulse" />
-                                <Sparkles className="absolute -bottom-2 -right-2 w-4 h-4 text-yellow-300 animate-pulse delay-75" />
-                                <Sparkles className="absolute -top-2 -right-2 w-3 h-3 text-yellow-300 animate-pulse delay-150" />
+                                <Sparkles className="absolute -top-2 -left-2 w-3 h-3 sm:w-4 sm:h-4 text-yellow-300 animate-pulse" />
+                                <Sparkles className="absolute -bottom-2 -right-2 w-3 h-3 sm:w-4 sm:h-4 text-yellow-300 animate-pulse delay-75" />
+                                <Sparkles className="absolute -top-2 -right-2 w-2 h-2 sm:w-3 sm:h-3 text-yellow-300 animate-pulse delay-150" />
                               </>
                             )}
                           </Button>
                         </div>
-                      </div>
                     </div>
                   </div>
 
