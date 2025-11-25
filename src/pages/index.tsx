@@ -219,7 +219,7 @@ const Home: NextPage = () => {
                   </motion.div>
 
                   <motion.h1
-                    className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl font-bold text-white leading-tight"
+                    className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
@@ -330,7 +330,7 @@ const Home: NextPage = () => {
                           </motion.div>
                         ))}
                       </div>
-                      <span className="whitespace-nowrap">12,000+ investors trust us</span>
+                      <span>12,000+ investors trust us</span>
                     </div>
                     <div className="h-4 w-px bg-slate-600 hidden sm:block"></div>
                     <motion.div
@@ -339,20 +339,20 @@ const Home: NextPage = () => {
                       transition={{ duration: 3, repeat: Infinity }}
                     >
                       <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="whitespace-nowrap">4.9/5 rating</span>
+                      <span>4.9/5 rating</span>
                     </motion.div>
                   </motion.div>
                 </motion.div>
 
                 {/* Visual Side - Enhanced Dashboard Preview */}
                 <motion.div
-                  className="relative order-first lg:order-last mt-8 lg:mt-0"
+                  className="relative order-first lg:order-last mt-8 lg:mt-0 w-full"
                   initial={{ opacity: 0, x: 50 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.8, delay: 0.4 }}
                 >
                   {/* Live Dashboard */}
-                  <div className="relative bg-white/10 backdrop-blur-xl rounded-2xl p-4 sm:p-6 border border-white/20 shadow-2xl overflow-hidden">
+                  <div className="relative bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 lg:p-6 border border-white/20 shadow-2xl overflow-hidden">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-white font-semibold" style={{ color: '#ffffff' }}>Live Rankings</h3>
@@ -374,13 +374,13 @@ const Home: NextPage = () => {
                               {forecaster.name.split(' ').map((n: string) => n[0]).join('')}
                             </div>
                             <div>
-                              <div className="text-white text-sm font-medium">{forecaster.name}</div>
-                              <div className="text-slate-200 text-xs">{forecaster.accuracy}% accuracy</div>
+                              <div className="text-white text-sm sm:text-base font-medium">{forecaster.name}</div>
+                              <div className="text-slate-200 text-xs sm:text-sm">{forecaster.accuracy}% accuracy</div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-white text-sm">{forecaster.profit}</div>
-                            <div className={`text-xs ${forecaster.trend.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
+                            <div className="text-white text-sm sm:text-base">{forecaster.profit}</div>
+                            <div className={`text-xs sm:text-sm ${forecaster.trend.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
                               {forecaster.trend}
                             </div>
                           </div>
@@ -455,7 +455,7 @@ const Home: NextPage = () => {
 
           {/* Crypto Analytics Section */}
           <motion.section
-            className="py-16 lg:py-24 bg-gradient-to-br from-orange-50 via-yellow-50 to-orange-100"
+            className="py-16 lg:py-24 bg-gradient-to-br from-orange-50 via-yellow-50 to-orange-100 overflow-hidden"
             variants={itemVariants}
           >
             <div className="container px-4 md:px-6">
@@ -479,7 +479,7 @@ const Home: NextPage = () => {
                 </p>
               </motion.div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
                 {[
                   {
                     icon: <Gauge className="h-8 w-8 text-orange-600" />,
@@ -600,13 +600,13 @@ const Home: NextPage = () => {
 
                 {/* Crypto Dashboard Preview */}
                 <motion.div
-                  className="relative"
+                  className="relative w-full"
                   initial={{ opacity: 0, x: 50 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.8, delay: 0.2 }}
                   viewport={{ once: true }}
                 >
-                  <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-orange-200 shadow-2xl">
+                  <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 sm:p-5 lg:p-6 border border-orange-200 shadow-2xl">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-semibold text-slate-900">Crypto Market Context</h4>
@@ -659,14 +659,14 @@ const Home: NextPage = () => {
                             viewport={{ once: true }}
                           >
                             <div className="flex items-center gap-2">
-                              <div className={`w-6 h-6 ${forecaster.color} rounded-full flex items-center justify-center text-white text-xs font-bold`}>
+                              <div className={`w-6 h-6 sm:w-7 sm:h-7 ${forecaster.color} rounded-full flex items-center justify-center text-white text-xs font-bold`}>
                                 {forecaster.name.split(' ').map((n: string) => n[0]).join('')}
                               </div>
-                              <span className="text-sm font-medium text-slate-700">{forecaster.name}</span>
+                              <span className="text-xs sm:text-sm font-medium text-slate-700">{forecaster.name}</span>
                             </div>
                             <div className="text-right">
-                              <div className="text-sm font-bold text-slate-900">{forecaster.accuracy}</div>
-                              <div className="text-xs text-green-600">{forecaster.trend}</div>
+                              <div className="text-xs sm:text-sm font-bold text-slate-900">{forecaster.accuracy}</div>
+                              <div className="text-xs sm:text-sm text-green-600">{forecaster.trend}</div>
                             </div>
                           </motion.div>
                         ))}
@@ -693,7 +693,7 @@ const Home: NextPage = () => {
                 <h2 className="text-3xl lg:text-5xl font-bold text-white mb-6">
                   Ready to Find Your Edge?
                 </h2>
-                <p className="text-xl text-finance-100 mb-8 max-w-2xl mx-auto">
+                <p className="text-base sm:text-lg lg:text-xl text-finance-100 mb-8 max-w-2xl mx-auto">
                   Join thousands of successful investors who trust our AI-powered forecasting platform.
                 </p>
                 <Button
