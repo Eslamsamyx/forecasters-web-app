@@ -142,6 +142,8 @@ jobs:
               fi
             else
               echo "❌ Schema sync failed! Restoring database..."
+              sudo -u postgres dropdb opinionpointer
+              sudo -u postgres createdb -O opinionpointer opinionpointer
               sudo -u postgres psql opinionpointer < $BACKUP_FILE
               echo "🔄 Database restored from backup"
               pm2 status opinionpointer
@@ -188,6 +190,8 @@ jobs:
               # If schema was changed, restore database
               if [ "$SCHEMA_CHANGED" = true ]; then
                 echo "🔄 Restoring database from backup..."
+                sudo -u postgres dropdb opinionpointer
+                sudo -u postgres createdb -O opinionpointer opinionpointer
                 sudo -u postgres psql opinionpointer < $BACKUP_FILE
                 echo "✅ Database restored"
               fi
